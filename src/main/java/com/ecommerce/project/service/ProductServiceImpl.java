@@ -10,6 +10,7 @@ import com.ecommerce.project.repositories.CategoryRepository;
 import com.ecommerce.project.repositories.ProductRepository;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.FieldError;
 import org.springframework.web.multipart.MultipartFile;
@@ -32,6 +33,12 @@ public class ProductServiceImpl implements ProductService {
 
     @Autowired
     private ModelMapper modelMapper;
+
+    @Autowired
+    private FileService fileService;
+
+    @Value("${project.image")
+    private String path;
 
     @Override
     public ProductDTO addProduct(Long categoryId, ProductDTO productDTO) {
@@ -86,12 +93,10 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public ProductDTO updateProduct(Long productId, ProductDTO productDTO) {
-        // Get existing product from DB
         Product productFromDB = productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "productId", productId));
         Product product = modelMapper.map(productDTO, Product.class);
 
-        // Update product info with the one in request body
         productFromDB.setProductName(product.getProductName());
         productFromDB.setDescription(product.getDescription());
         productFromDB.setQuantity(product.getQuantity());
@@ -99,7 +104,6 @@ public class ProductServiceImpl implements ProductService {
         productFromDB.setPrice(product.getPrice());
         productFromDB.setSpecialPrice(product.getSpecialPrice());
 
-        // Save to DB
         Product savedProduct =productRepository.save(productFromDB);
 
         return modelMapper.map(savedProduct, ProductDTO.class);
@@ -115,42 +119,14 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public ProductDTO updateProductImage(Long productId, MultipartFile image) throws IOException {
-        // Get product from DB
         Product productFromDB = productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "protuctId", productId));
+        String fileName = fileService.uploadImage(path, image);
 
-        // Upload image to server
-        // Get the file name of uploaded image
-        String path = "/images";
-        String fileName = uploadImage(path, image);
-
-        // Update new file name to the product
         productFromDB.setImage(fileName);
 
-        // Save updated product
         Product updatedProduct = productRepository.save(productFromDB);
 
-        // return DTO after mapping product to DTO
         return modelMapper.map(updatedProduct, ProductDTO.class);
-    }
-
-    private String uploadImage(String path, MultipartFile file) throws IOException {
-        // File name of current / original file
-        String originalFilename = file.getOriginalFilename();
-
-        // Generate a unique file name
-        String randomId = UUID.randomUUID().toString();
-        String fileName = randomId.concat(originalFilename.substring(originalFilename.lastIndexOf('.')));
-        String filePath = path + File.separator + fileName;
-
-        // Check if path exists and create
-        File folder = new File(path);
-        if(!folder.exists())
-            folder.mkdir();
-
-        // Upload to server
-        Files.copy(file.getInputStream(), Paths.get(filePath));
-
-        return fileName;
     }
 }
